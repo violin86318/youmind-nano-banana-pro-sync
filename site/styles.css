@@ -60,7 +60,7 @@ img {
 .shell {
   width: min(1440px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 18px 0 72px;
+  padding: 18px 0 132px;
 }
 
 .nav,
@@ -314,10 +314,92 @@ h1 {
   line-height: 1.55;
 }
 
-.workbench,
 .catalog {
   margin-top: 16px;
   padding: 16px;
+}
+
+.workbench {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  z-index: 60;
+  width: min(1180px, calc(100% - 32px));
+  max-height: min(74vh, 680px);
+  margin: 0 auto;
+  padding: 0;
+  overflow: hidden;
+  box-shadow:
+    6px 6px 0 var(--line),
+    0 18px 44px rgba(17, 17, 17, 0.2);
+}
+
+.workbench:focus {
+  outline: none;
+}
+
+.workbench .section-head {
+  align-items: center;
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--paper);
+}
+
+.workbench .section-head h2 {
+  max-width: 44vw;
+  overflow: hidden;
+  font-size: clamp(1.15rem, 2vw, 1.8rem);
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workbench .section-head .eyebrow {
+  margin-bottom: 4px;
+}
+
+.workbench .section-actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+
+.workbench .button {
+  min-height: 36px;
+}
+
+.workbench.is-collapsed {
+  left: auto;
+  width: min(560px, calc(100% - 32px));
+  max-height: 74px;
+}
+
+.workbench.is-collapsed .workbench-grid {
+  display: none;
+}
+
+.workbench.is-collapsed .section-head h2 {
+  max-width: 180px;
+}
+
+.workbench.is-pulsing {
+  animation: workbenchPulse 760ms ease;
+}
+
+@keyframes workbenchPulse {
+  0%,
+  100% {
+    box-shadow:
+      6px 6px 0 var(--line),
+      0 18px 44px rgba(17, 17, 17, 0.2);
+  }
+
+  42% {
+    box-shadow:
+      6px 6px 0 var(--line),
+      0 0 0 5px rgba(246, 230, 90, 0.72),
+      0 22px 54px rgba(17, 17, 17, 0.24);
+  }
 }
 
 .section-head {
@@ -338,6 +420,11 @@ h1 {
   display: grid;
   grid-template-columns: minmax(320px, 0.85fr) minmax(360px, 1.15fr);
   gap: 12px;
+  max-height: min(calc(74vh - 70px), 610px);
+  overflow: auto;
+  padding: 12px;
+  border-top: 2px solid var(--line);
+  background: var(--paper);
 }
 
 .source-card,
@@ -791,6 +878,7 @@ pre {
   .shell {
     width: min(100% - 20px, 1440px);
     padding-top: 10px;
+    padding-bottom: 112px;
   }
 
   .nav,
@@ -801,6 +889,47 @@ pre {
 
   .nav {
     position: static;
+  }
+
+  .workbench {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    width: auto;
+  }
+
+  .workbench.is-collapsed {
+    left: 10px;
+    width: auto;
+    max-height: 68px;
+  }
+
+  .workbench .section-head {
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .workbench .section-head h2 {
+    max-width: 30vw;
+    font-size: 1rem;
+  }
+
+  .workbench .section-actions {
+    gap: 6px;
+    overflow-x: auto;
+  }
+
+  .workbench .button {
+    min-height: 34px;
+    padding: 0 9px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .workbench-grid {
+    max-height: calc(78vh - 62px);
   }
 
   h1 {

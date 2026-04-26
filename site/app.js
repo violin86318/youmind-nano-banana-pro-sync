@@ -60,8 +60,11 @@ const elements = {
   heroTitle: document.querySelector("#hero-title"),
   heroDescription: document.querySelector("#hero-description"),
   heroRandom: document.querySelector("#hero-random"),
+  openWorkbench: document.querySelector("#open-workbench"),
+  workbench: document.querySelector("#workbench"),
   workbenchRandom: document.querySelector("#workbench-random"),
   copyWorkbench: document.querySelector("#copy-workbench"),
+  toggleWorkbench: document.querySelector("#toggle-workbench"),
   workbenchImage: document.querySelector("#workbench-image"),
   workbenchSourceTag: document.querySelector("#workbench-source-tag"),
   workbenchTitle: document.querySelector("#workbench-title"),
@@ -237,6 +240,18 @@ function showTemporaryLabel(button, label = "已复制") {
 function pickRandomPrompt(pool = state.filtered.length ? state.filtered : state.prompts) {
   if (!pool.length) return null;
   return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function setWorkbenchExpanded(expanded) {
+  elements.workbench.classList.toggle("is-collapsed", !expanded);
+  elements.toggleWorkbench.textContent = expanded ? "收起" : "展开";
+  elements.toggleWorkbench.setAttribute("aria-expanded", String(expanded));
+}
+
+function pulseWorkbench() {
+  elements.workbench.classList.remove("is-pulsing");
+  void elements.workbench.offsetWidth;
+  elements.workbench.classList.add("is-pulsing");
 }
 
 function renderCategories() {
@@ -418,6 +433,8 @@ function renderCards() {
     article.querySelector('[data-action="open"]').addEventListener("click", () => openModal(prompt.id));
     article.querySelector('[data-action="workbench"]').addEventListener("click", (event) => {
       selectWorkbenchPrompt(prompt);
+      setWorkbenchExpanded(true);
+      pulseWorkbench();
       showTemporaryLabel(event.currentTarget, "已加入");
     });
     article.querySelector('[data-action="copy"]').addEventListener("click", async (event) => {
@@ -497,11 +514,24 @@ function bindEvents() {
   elements.heroRandom.addEventListener("click", () => {
     const prompt = pickRandomPrompt(state.prompts);
     selectWorkbenchPrompt(prompt);
-    document.querySelector("#workbench").scrollIntoView({ block: "start" });
+    pulseWorkbench();
+  });
+
+  elements.openWorkbench.addEventListener("click", (event) => {
+    event.preventDefault();
+    setWorkbenchExpanded(true);
+    pulseWorkbench();
+    elements.workbench.focus({ preventScroll: true });
   });
 
   elements.workbenchRandom.addEventListener("click", () => {
     selectWorkbenchPrompt(pickRandomPrompt());
+    setWorkbenchExpanded(true);
+    pulseWorkbench();
+  });
+
+  elements.toggleWorkbench.addEventListener("click", () => {
+    setWorkbenchExpanded(elements.workbench.classList.contains("is-collapsed"));
   });
 
   elements.copyWorkbench.addEventListener("click", async () => {
@@ -573,7 +603,8 @@ function bindEvents() {
   elements.modalUseWorkbench.addEventListener("click", () => {
     selectWorkbenchPrompt(state.activeModalPrompt);
     closeModal();
-    document.querySelector("#workbench").scrollIntoView({ block: "start" });
+    setWorkbenchExpanded(true);
+    pulseWorkbench();
   });
 }
 
