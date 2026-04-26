@@ -101,15 +101,21 @@ jobs:
           node-version: "22"
 
       - name: Fetch latest prompts from YouMind
+        if: ${{ github.event_name != 'push' || hashFiles('site/data/prompts.json') == '' }}
         run: npm run fetch
 
       - name: Build GitHub Pages site from public snapshot
+        if: ${{ github.event_name != 'push' || hashFiles('site/data/prompts.json') == '' }}
         env:
           SITE_SOURCE_MODE: public-only
         run: npm run build:site
 
+      - name: Verify site snapshot
+        run: |
+          node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('site/data/prompts.json','utf8')); if (!Array.isArray(data.prompts) || data.prompts.length === 0) throw new Error('site/data/prompts.json has no prompts'); console.log('prompts=' + data.prompts.length);"
+
       - name: Commit generated content back to fork
-        if: ${{ vars.COMMIT_GENERATED_SITE == '1' }}
+        if: ${{ vars.COMMIT_GENERATED_SITE == '1' && github.event_name != 'push' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
