@@ -1,0 +1,129 @@
+name: Sync And Deploy
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/**"
+      - "site/**"
+      - ".github/workflows/sync-and-deploy.yml"
+      - "package.json"
+
+concurrency:
+  group: youmind-nano-banana-pro-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  YOUMIND_MODEL: nano-banana-pro
+  YOUMIND_LOCALE: zh-CN
+
+jobs:
+  sync-lark-and-deploy:
+    if: ${{ vars.ENABLE_SELF_HOSTED_LARK_SYNC == '1' }}
+    runs-on:
+      - self-hosted
+      - macOS
+      - ARM64
+      - youmind-sync
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Configure persistent prompt cache
+        run: |
+          echo "YOUMIND_CACHE_DIR=$HOME/.cache/youmind-nano-banana-pro-sync" >> "$GITHUB_ENV"
+          echo "YOUMIND_MAX_CACHE_AGE_HOURS=2" >> "$GITHUB_ENV"
+          echo "YOUMIND_ALLOW_STALE_CACHE_ON_ERROR=1" >> "$GITHUB_ENV"
+          echo "YOUMIND_MAX_RETRIES=2" >> "$GITHUB_ENV"
+          echo "YOUMIND_PAGE_DELAY_MS=2000" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.cache/youmind-nano-banana-pro-sync"
+
+      - name: Fetch latest prompts from YouMind
+        run: npm run fetch
+
+      - name: Sync snapshot to Feishu Bitable with lark-cli
+        env:
+          FEISHU_BASE_TOKEN: ${{ secrets.FEISHU_BASE_TOKEN }}
+          FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
+        run: npm run sync:lark:local-auth
+
+      - name: Build GitHub Pages site from Feishu first
+        env:
+          FEISHU_BASE_TOKEN: ${{ secrets.FEISHU_BASE_TOKEN }}
+          FEISHU_TABLE_ID: ${{ secrets.FEISHU_TABLE_ID }}
+          SITE_SOURCE_MODE: feishu-first
+        run: npm run build:site
+
+      - name: Commit generated content back to fork
+        if: ${{ vars.COMMIT_GENERATED_SITE == '1' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/prompts.zh-CN.json site/data/prompts.json
+          git diff --cached --quiet || git commit -m "chore: sync Nano Banana Pro prompts [skip ci]"
+          git push
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+      - name: Deploy To GitHub Pages
+        uses: actions/deploy-pages@v4
+
+  public-snapshot-deploy:
+    if: ${{ vars.ENABLE_SELF_HOSTED_LARK_SYNC != '1' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Fetch latest prompts from YouMind
+        run: npm run fetch
+
+      - name: Build GitHub Pages site from public snapshot
+        env:
+          SITE_SOURCE_MODE: public-only
+        run: npm run build:site
+
+      - name: Commit generated content back to fork
+        if: ${{ vars.COMMIT_GENERATED_SITE == '1' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f data/prompts.zh-CN.json site/data/prompts.json
+          git diff --cached --quiet || git commit -m "chore: sync Nano Banana Pro prompts [skip ci]"
+          git push
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+      - name: Deploy To GitHub Pages
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>我的 Nano Banana Pro 提示词库</title>
+    <meta
+      name="description"
+      content="基于 YouMind Nano Banana Pro 公共提示词数据建立的个人提示词网站。"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="nav">
+        <a class="brand" href="#top" aria-label="返回首页">
+          <span class="brand-mark">NBP</span>
+          <span>
+            <strong>我的提示词库</strong>
+            <small>Nano Banana Pro</small>
+          </span>
+        </a>
+        <nav class="nav-links" aria-label="页面导航">
+          <a href="#catalog">提示词</a>
+          <a href="#workbench">工作台</a>
+          <a href="https://youmind.com/zh-CN/nano-banana-pro-prompts" target="_blank" rel="noreferrer">
+            数据源
+          </a>
+        </nav>
+      </header>
+
+      <section id="top" class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">简体中文 · 每日持续更新中</p>
+          <h1>Nano Banana Pro 提示词</h1>
+          <p class="hero-lede">
+            这是一个属于你的可搜索提示词网站：保留 YouMind 的分类浏览和卡片阅读体验，增加随机选择、变量替换、复制与详情预览工作流。
+          </p>
+          <div class="hero-actions">
+            <button id="hero-random" class="button primary" type="button">随机提示词</button>
+            <a class="button secondary" href="#catalog">浏览精选</a>
+          </div>
+        </div>
+
+        <aside class="hero-panel" aria-label="数据概览">
+          <div class="stat-grid">
+            <div>
+              <span>总计</span>
+              <strong id="stat-total">-</strong>
+            </div>
+            <div>
+              <span>本站样本</span>
+              <strong id="stat-local">-</strong>
+            </div>
+            <div>
+              <span>精选</span>
+              <strong id="stat-featured">-</strong>
+            </div>
+            <div>
+              <span>更新</span>
+              <strong id="stat-updated">-</strong>
+            </div>
+          </div>
+          <div class="hero-preview">
+            <img id="hero-image" alt="" />
+            <div>
+              <p class="eyebrow">当前提示词</p>
+              <h2 id="hero-title">加载中</h2>
+              <p id="hero-description"></p>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section id="workbench" class="workbench">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Prompt Workbench</p>
+            <h2>生成前先替换变量</h2>
+          </div>
+          <div class="section-actions">
+            <button id="workbench-random" class="button secondary" type="button">换一个</button>
+            <button id="copy-workbench" class="button primary" type="button">复制输出</button>
+          </div>
+        </div>
+        <div class="workbench-grid">
+          <div class="workbench-source">
+            <div class="source-card">
+              <img id="workbench-image" alt="" />
+              <div>
+                <span id="workbench-source-tag" class="pill">未选择</span>
+                <h3 id="workbench-title">从卡片选择一个提示词</h3>
+                <p id="workbench-summary">点击任意卡片的“放入工作台”，或使用随机按钮。</p>
+              </div>
+            </div>
+            <div id="argument-fields" class="argument-fields" aria-label="变量设置"></div>
+          </div>
+          <div class="workbench-output">
+            <label class="select-field">
+              <span>输出版本</span>
+              <select id="prompt-version">
+                <option value="translated">中文优先</option>
+                <option value="original">原始提示词</option>
+              </select>
+            </label>
+            <pre id="workbench-output-text"></pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="catalog" class="catalog">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Prompt Catalog</p>
+            <h2>提示词</h2>
+          </div>
+          <p id="result-count" class="result-count">加载中</p>
+        </div>
+
+        <div class="controls" aria-label="筛选控件">
+          <label class="search-field">
+            <span>搜索</span>
+            <input id="search-input" type="search" placeholder="标题 / 作者 / 提示词 / 场景" />
+          </label>
+          <label class="select-field">
+            <span>排序</span>
+            <select id="sort-select">
+              <option value="featured">精选优先</option>
+              <option value="newest">最新发布</option>
+              <option value="images">图片最多</option>
+              <option value="longest">提示词最长</option>
+            </select>
+          </label>
+          <button id="toggle-featured" class="button secondary" type="button">只看精选</button>
+          <button id="toggle-reference" class="button secondary" type="button">需要参考图</button>
+          <button id="clear-filters" class="button ghost" type="button">清空</button>
+        </div>
+
+        <div id="category-strip" class="category-strip" aria-label="分类"></div>
+        <div id="cards" class="card-grid" aria-live="polite"></div>
+        <div id="empty-state" class="empty-state hidden">
+          <h2>没有匹配结果</h2>
+          <p>换个关键词或清空筛选条件。</p>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="detail-modal" class="modal">
+      <div class="modal-shell">
+        <button id="close-modal" class="icon-button" type="button" aria-label="关闭">×</button>
+        <div class="modal-media">
+          <div id="modal-image-stage" class="modal-image-stage"></div>
+          <div id="modal-thumbs" class="modal-thumbs"></div>
+        </div>
+        <div class="modal-body">
+          <div class="modal-meta">
+            <span id="modal-featured" class="pill accent hidden">精选</span>
+            <span id="modal-author" class="pill"></span>
+            <span id="modal-date" class="pill"></span>
+          </div>
+          <h2 id="modal-title"></h2>
+          <p id="modal-description" class="modal-description"></p>
+          <div id="modal-tags" class="tag-row"></div>
+          <div class="modal-actions">
+            <button id="modal-use-workbench" class="button primary" type="button">放入工作台</button>
+            <button id="modal-copy" class="button secondary" type="button">复制提示词</button>
+            <a id="modal-youmind" class="button ghost" target="_blank" rel="noreferrer">YouMind</a>
+            <a id="modal-source" class="button ghost" target="_blank" rel="noreferrer">原始来源</a>
+          </div>
+          <div class="tabs" role="tablist" aria-label="提示词版本">
+            <button id="tab-translated" class="tab active" type="button">中文</button>
+            <button id="tab-original" class="tab" type="button">原始</button>
+          </div>
+          <pre id="modal-prompt" class="modal-prompt"></pre>
+        </div>
+      </div>
+    </dialog>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
