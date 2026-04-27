@@ -37,16 +37,24 @@ const CATEGORY_FILTERS = [
   }
 ];
 
+const INITIAL_VISIBLE_COUNT = 72;
+const VISIBLE_INCREMENT = 72;
+
 const state = {
   prompts: [],
+  promptById: new Map(),
+  detailCache: new Map(),
+  chunkRequests: new Map(),
   filtered: [],
   activeCategory: "all",
   query: "",
   sort: "featured",
   featuredOnly: false,
   referenceOnly: false,
+  visibleCount: INITIAL_VISIBLE_COUNT,
   activePrompt: null,
   activeModalPrompt: null,
+  modalLoading: false,
   modalMode: "translated",
   argumentValues: {}
 };
@@ -80,6 +88,7 @@ const elements = {
   categoryStrip: document.querySelector("#category-strip"),
   resultCount: document.querySelector("#result-count"),
   cards: document.querySelector("#cards"),
+  loadMore: document.querySelector("#load-more"),
   empty: document.querySelector("#empty-state"),
   modal: document.querySelector("#detail-modal"),
   closeModal: document.querySelector("#close-modal"),
@@ -131,9 +140,11 @@ function truncate(value, length = 150) {
 
 function getPromptText(prompt, mode = "translated") {
   if (!prompt) return "";
-  return mode === "original"
-    ? prompt.prompt || prompt.translatedPrompt || ""
-    : prompt.translatedPrompt || prompt.prompt || "";
+  if (mode === "original") {
+    return prompt.prompt || prompt.originalPromptPreview || prompt.translatedPrompt || prompt.promptPreview || "";
+  }
+
+  return prompt.translatedPrompt || prompt.translatedPromptPreview || prompt.prompt || prompt.promptPreview || "";
 }
 
 function getSearchText(prompt) {
@@ -145,6 +156,9 @@ function getSearchText(prompt) {
     prompt.language,
     prompt.sourcePlatform,
     ...(prompt.categories || []),
+    prompt.promptPreview,
+    prompt.originalPromptPreview,
+    prompt.translatedPromptPreview,
     prompt.prompt,
     prompt.translatedPrompt
   ]
@@ -170,12 +184,64 @@ function getCategoryLabels(prompt) {
 }
 
 function getPreviewImage(prompt) {
-  return prompt?.thumbnailUrl || prompt?.mediaThumbnails?.[0] || prompt?.media?.[0] || "";
+  return (
+    prompt?.thumbnailUrl ||
+    prompt?.mediaPreview?.[0] ||
+    prompt?.mediaThumbnails?.[0] ||
+    prompt?.media?.[0] ||
+    ""
+  );
 }
 
 function getImages(prompt) {
-  const images = prompt?.media?.length ? prompt.media : prompt?.mediaThumbnails || [];
+  const images = prompt?.media?.length
+    ? prompt.media
+    : prompt?.mediaThumbnails?.length
+      ? prompt.mediaThumbnails
+      : prompt?.mediaPreview || [];
   return images.filter(Boolean);
+}
+
+function hasFullPrompt(prompt) {
+  return Boolean(prompt && ("prompt" in prompt || "translatedPrompt" in prompt));
+}
+
+async function loadPromptDetail(promptOrId) {
+  const promptId = String(typeof promptOrId === "object" ? promptOrId.id : promptOrId);
+
+  if (state.detailCache.has(promptId)) {
+    return state.detailCache.get(promptId);
+  }
+
+  const indexPrompt = state.promptById.get(promptId);
+  if (!indexPrompt?.detailChunk) {
+    return indexPrompt || null;
+  }
+
+  let request = state.chunkRequests.get(indexPrompt.detailChunk);
+  if (!request) {
+    request = fetch(`./data/prompts/${indexPrompt.detailChunk}`).then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to load prompt detail: ${response.status}`);
+      }
+
+      const payload = await response.json();
+      for (const detail of payload.prompts || []) {
+        const id = String(detail.id);
+        state.detailCache.set(id, {
+          ...(state.promptById.get(id) || {}),
+          ...detail
+        });
+        state.promptById.set(id, state.detailCache.get(id));
+      }
+
+      return payload;
+    });
+    state.chunkRequests.set(indexPrompt.detailChunk, request);
+  }
+
+  await request;
+  return state.detailCache.get(promptId) || indexPrompt;
 }
 
 function extractArguments(text) {
@@ -280,10 +346,10 @@ function sortPrompts(prompts) {
       return Date.parse(right.sourcePublishedAt || "") - Date.parse(left.sourcePublishedAt || "");
     }
     if (state.sort === "images") {
-      return getImages(right).length - getImages(left).length;
+      return (right.mediaCount || getImages(right).length) - (left.mediaCount || getImages(left).length);
     }
     if (state.sort === "longest") {
-      return getPromptText(right).length - getPromptText(left).length;
+      return (right.promptLength || getPromptText(right).length) - (left.promptLength || getPromptText(left).length);
     }
 
     const featuredDelta = Number(Boolean(right.featured)) - Number(Boolean(left.featured));
@@ -292,7 +358,11 @@ function sortPrompts(prompts) {
   });
 }
 
-function applyFilters() {
+function applyFilters({ resetVisible = true } = {}) {
+  if (resetVisible) {
+    state.visibleCount = INITIAL_VISIBLE_COUNT;
+  }
+
   const tokens = state.query
     .trim()
     .toLowerCase()
@@ -308,7 +378,12 @@ function applyFilters() {
       return false;
     }
 
-    if (state.referenceOnly && !prompt.needReferenceImages && !prompt.referenceImages?.length) {
+    if (
+      state.referenceOnly &&
+      !prompt.needReferenceImages &&
+      !prompt.referenceImages?.length &&
+      !prompt.referenceImageCount
+    ) {
       return false;
     }
 
@@ -341,7 +416,7 @@ function setHeroPrompt(prompt) {
   elements.heroImage.alt = prompt.title || "";
 }
 
-function selectWorkbenchPrompt(prompt) {
+async function selectWorkbenchPrompt(prompt) {
   if (!prompt) return;
   state.activePrompt = prompt;
   state.argumentValues = {};
@@ -352,10 +427,22 @@ function selectWorkbenchPrompt(prompt) {
   elements.workbenchSourceTag.textContent = prompt.featured ? "精选提示词" : `#${prompt.id}`;
   elements.workbenchTitle.textContent = prompt.title || "Untitled";
   elements.workbenchSummary.textContent = truncate(prompt.description || getPromptText(prompt), 150);
+  setHeroPrompt(prompt);
+
+  if (!hasFullPrompt(prompt)) {
+    elements.argumentFields.innerHTML = "";
+    elements.workbenchOutputText.textContent = "正在加载完整提示词…";
+    const detail = await loadPromptDetail(prompt);
+
+    if (!detail || String(state.activePrompt?.id) !== String(prompt.id)) {
+      return;
+    }
+
+    state.activePrompt = detail;
+  }
 
   renderArgumentFields();
   updateWorkbenchOutput();
-  setHeroPrompt(prompt);
 }
 
 function renderArgumentFields() {
@@ -390,17 +477,20 @@ function updateWorkbenchOutput() {
 
 function renderCards() {
   elements.cards.innerHTML = "";
-  elements.resultCount.textContent = `${formatNumber(state.filtered.length)} / ${formatNumber(state.prompts.length)}`;
+  const visiblePrompts = state.filtered.slice(0, state.visibleCount);
+  elements.resultCount.textContent = `${formatNumber(visiblePrompts.length)} / ${formatNumber(state.filtered.length)} / ${formatNumber(state.prompts.length)}`;
 
   if (!state.filtered.length) {
     elements.empty.classList.remove("hidden");
+    elements.loadMore.classList.add("hidden");
     return;
   }
 
   elements.empty.classList.add("hidden");
+  elements.loadMore.classList.toggle("hidden", visiblePrompts.length >= state.filtered.length);
   const fragment = document.createDocumentFragment();
 
-  for (const prompt of state.filtered) {
+  for (const prompt of visiblePrompts) {
     const article = document.createElement("article");
     article.className = "prompt-card";
     const image = getPreviewImage(prompt);
@@ -411,7 +501,7 @@ function renderCards() {
       <div class="card-thumb">
         ${
           image
-            ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(prompt.title)}" loading="lazy" />`
+            ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(prompt.title)}" loading="lazy" decoding="async" />`
             : `<div class="modal-placeholder">No preview</div>`
         }
         ${prompt.featured ? `<span class="pill accent badge">精选</span>` : ""}
@@ -430,7 +520,9 @@ function renderCards() {
       </div>
     `;
 
-    article.querySelector('[data-action="open"]').addEventListener("click", () => openModal(prompt.id));
+    article.querySelector('[data-action="open"]').addEventListener("click", () => {
+      void openModal(prompt.id);
+    });
     article.querySelector('[data-action="workbench"]').addEventListener("click", (event) => {
       selectWorkbenchPrompt(prompt);
       setWorkbenchExpanded(true);
@@ -438,7 +530,9 @@ function renderCards() {
       showTemporaryLabel(event.currentTarget, "已加入");
     });
     article.querySelector('[data-action="copy"]').addEventListener("click", async (event) => {
-      await writeClipboardText(getPromptText(prompt));
+      showTemporaryLabel(event.currentTarget, "加载中");
+      const detail = await loadPromptDetail(prompt);
+      await writeClipboardText(getPromptText(detail || prompt));
       showTemporaryLabel(event.currentTarget);
     });
 
@@ -476,17 +570,19 @@ function renderModalMedia(prompt, activeIndex = 0) {
 }
 
 function renderModalPrompt() {
-  elements.modalPrompt.textContent = getPromptText(state.activeModalPrompt, state.modalMode);
+  elements.modalPrompt.textContent = state.modalLoading
+    ? "正在加载完整提示词…"
+    : getPromptText(state.activeModalPrompt, state.modalMode);
   elements.tabTranslated.classList.toggle("active", state.modalMode === "translated");
   elements.tabOriginal.classList.toggle("active", state.modalMode === "original");
 }
 
-function openModal(promptId) {
-  const prompt = state.prompts.find((item) => String(item.id) === String(promptId));
+function renderModal(prompt, { loading = false } = {}) {
   if (!prompt) return;
 
   state.activeModalPrompt = prompt;
-  state.modalMode = prompt.translatedPrompt ? "translated" : "original";
+  state.modalLoading = loading;
+  state.modalMode = getPromptText(prompt, "translated") ? "translated" : "original";
   renderModalMedia(prompt);
   elements.modalFeatured.classList.toggle("hidden", !prompt.featured);
   elements.modalAuthor.textContent = prompt.authorName || "Unknown";
@@ -504,6 +600,24 @@ function openModal(promptId) {
   if (!elements.modal.open) {
     elements.modal.showModal();
   }
+}
+
+async function openModal(promptId) {
+  const prompt = state.promptById.get(String(promptId));
+  if (!prompt) return;
+
+  renderModal(prompt, { loading: !hasFullPrompt(prompt) });
+
+  if (hasFullPrompt(prompt)) {
+    return;
+  }
+
+  const detail = await loadPromptDetail(prompt);
+  if (!detail || String(state.activeModalPrompt?.id) !== String(promptId)) {
+    return;
+  }
+
+  renderModal(detail);
 }
 
 function closeModal() {
@@ -580,6 +694,11 @@ function bindEvents() {
     applyFilters();
   });
 
+  elements.loadMore.addEventListener("click", () => {
+    state.visibleCount += VISIBLE_INCREMENT;
+    renderCards();
+  });
+
   elements.closeModal.addEventListener("click", closeModal);
   elements.modal.addEventListener("click", (event) => {
     if (event.target === elements.modal) closeModal();
@@ -596,6 +715,15 @@ function bindEvents() {
   });
 
   elements.modalCopy.addEventListener("click", async () => {
+    if (state.modalLoading) {
+      const detail = await loadPromptDetail(state.activeModalPrompt);
+      if (detail) {
+        state.activeModalPrompt = detail;
+        state.modalLoading = false;
+        renderModalPrompt();
+      }
+    }
+
     await writeClipboardText(elements.modalPrompt.textContent || "");
     showTemporaryLabel(elements.modalCopy);
   });
@@ -611,11 +739,12 @@ function bindEvents() {
 async function init() {
   bindEvents();
 
-  const response = await fetch("./data/prompts.json");
+  const response = await fetch("./data/index.json");
   if (!response.ok) throw new Error(`Failed to load prompts: ${response.status}`);
   const payload = await response.json();
 
   state.prompts = payload.prompts || [];
+  state.promptById = new Map(state.prompts.map((prompt) => [String(prompt.id), prompt]));
   state.filtered = sortPrompts(state.prompts);
 
   renderStats(payload);
@@ -624,7 +753,6 @@ async function init() {
 
   const firstFeatured = state.prompts.find((prompt) => prompt.featured) || state.prompts[0];
   setHeroPrompt(firstFeatured);
-  selectWorkbenchPrompt(firstFeatured);
 }
 
 init().catch((error) => {

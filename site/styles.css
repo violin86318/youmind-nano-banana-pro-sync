@@ -589,6 +589,8 @@ pre {
 }
 
 .prompt-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 440px;
   display: inline-block;
   width: 100%;
   margin: 0 0 14px;
@@ -690,6 +692,16 @@ pre {
 .empty-state {
   padding: 32px;
   text-align: center;
+}
+
+.load-more-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 18px 0 4px;
+}
+
+.load-more-wrap .button {
+  min-width: 180px;
 }
 
 .empty-state p {

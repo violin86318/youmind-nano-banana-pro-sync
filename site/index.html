@@ -8,7 +8,7 @@
       name="description"
       content="基于 YouMind Nano Banana Pro 公共提示词数据建立的个人提示词网站。"
     />
-    <link rel="stylesheet" href="./styles.css?v=20260427-1" />
+    <link rel="stylesheet" href="./styles.css?v=20260427-2" />
   </head>
   <body>
     <main class="shell">
@@ -62,7 +62,7 @@
             </div>
           </div>
           <div class="hero-preview">
-            <img id="hero-image" alt="" />
+            <img id="hero-image" alt="" decoding="async" fetchpriority="high" />
             <div>
               <p class="eyebrow">当前提示词</p>
               <h2 id="hero-title">加载中</h2>
@@ -139,6 +139,9 @@
 
         <div id="category-strip" class="category-strip" aria-label="分类"></div>
         <div id="cards" class="card-grid" aria-live="polite"></div>
+        <div class="load-more-wrap">
+          <button id="load-more" class="button secondary hidden" type="button">加载更多</button>
+        </div>
         <div id="empty-state" class="empty-state hidden">
           <h2>没有匹配结果</h2>
           <p>换个关键词或清空筛选条件。</p>
@@ -177,6 +180,6 @@
       </div>
     </dialog>
 
-    <script type="module" src="./app.js?v=20260427-1"></script>
+    <script type="module" src="./app.js?v=20260427-2"></script>
   </body>
 </html>

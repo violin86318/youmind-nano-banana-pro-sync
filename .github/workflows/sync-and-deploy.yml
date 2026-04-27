@@ -73,7 +73,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f data/prompts.zh-CN.json site/data/prompts.json
+          git add -f data/prompts.zh-CN.json site/data/prompts.json site/data/index.json site/data/prompts
+          git add -u site/data/prompts
           git diff --cached --quiet || git commit -m "chore: sync Nano Banana Pro prompts [skip ci]"
           git push
 
@@ -101,25 +102,26 @@ jobs:
           node-version: "22"
 
       - name: Fetch latest prompts from YouMind
-        if: ${{ github.event_name != 'push' || hashFiles('site/data/prompts.json') == '' }}
+        if: ${{ github.event_name != 'push' || hashFiles('site/data/index.json') == '' }}
         run: npm run fetch
 
       - name: Build GitHub Pages site from public snapshot
-        if: ${{ github.event_name != 'push' || hashFiles('site/data/prompts.json') == '' }}
+        if: ${{ github.event_name != 'push' || hashFiles('site/data/index.json') == '' }}
         env:
           SITE_SOURCE_MODE: public-only
         run: npm run build:site
 
       - name: Verify site snapshot
         run: |
-          node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('site/data/prompts.json','utf8')); if (!Array.isArray(data.prompts) || data.prompts.length === 0) throw new Error('site/data/prompts.json has no prompts'); console.log('prompts=' + data.prompts.length);"
+          node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync('site/data/index.json','utf8')); if (!Array.isArray(data.prompts) || data.prompts.length === 0) throw new Error('site/data/index.json has no prompts'); console.log('prompts=' + data.prompts.length);"
 
       - name: Commit generated content back to fork
         if: ${{ vars.COMMIT_GENERATED_SITE == '1' && github.event_name != 'push' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f data/prompts.zh-CN.json site/data/prompts.json
+          git add -f data/prompts.zh-CN.json site/data/prompts.json site/data/index.json site/data/prompts
+          git add -u site/data/prompts
           git diff --cached --quiet || git commit -m "chore: sync Nano Banana Pro prompts [skip ci]"
           git push
 
