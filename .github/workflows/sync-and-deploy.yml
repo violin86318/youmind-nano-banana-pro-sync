@@ -2,6 +2,12 @@ name: Sync And Deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      refresh_public_snapshot:
+        description: "Fetch a fresh public snapshot before deploying"
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: "0 */6 * * *"
   push:
@@ -102,11 +108,11 @@ jobs:
           node-version: "22"
 
       - name: Fetch latest prompts from YouMind
-        if: ${{ github.event_name != 'push' || hashFiles('site/data/index.json') == '' }}
+        if: ${{ inputs.refresh_public_snapshot == true || hashFiles('site/data/index.json') == '' }}
         run: npm run fetch
 
       - name: Build GitHub Pages site from public snapshot
-        if: ${{ github.event_name != 'push' || hashFiles('site/data/index.json') == '' }}
+        if: ${{ inputs.refresh_public_snapshot == true || hashFiles('site/data/index.json') == '' }}
         env:
           SITE_SOURCE_MODE: public-only
         run: npm run build:site
